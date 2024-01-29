@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
 	"strconv"
 	"sync"
@@ -40,12 +43,15 @@ var threads = 4
 var respTime []float64
 var firstRespTime []float64
 var speed []float64
+var cliOcaIpVersion string
+var cliFastApiIpVersion string
 
 func Request(url *url.URL, path string, callback func(info req.DownloadInfo)) (req.TraceInfo, int, error) {
 	req_url := *url
 	req_url.Path = req_url.Path + path
 	resp, err := downloader.R().SetOutputFile("/dev/null").SetDownloadCallbackWithInterval(callback, 20*time.Millisecond).Get(req_url.String())
 	if err != nil {
+		fmt.Println(err)
 		if err == io.ErrUnexpectedEOF {
 			return resp.TraceInfo(), len(resp.Bytes()), nil
 		}
@@ -59,14 +65,25 @@ func Request(url *url.URL, path string, callback func(info req.DownloadInfo)) (r
 }
 
 func init() {
+	flag.StringVar(&cliOcaIpVersion, "o", "", "Set Connect OCA IP Version")
+	flag.StringVar(&cliFastApiIpVersion, "a", "", "Set Connect Fast API IP Version")
 	downloader.EnableTraceAll()
 	// downloader.EnableDumpAll()
 	bytesPerThread = make([]uint64, threads)
+	downloader.EnableTraceAll()
 }
 
 func main() {
+	flag.Parse()
+	client := req.C().SetDial(func(ctx context.Context, network, addr string) (net.Conn, error) {
+		dialer := &net.Dialer{}
+		return dialer.Dial(network+cliFastApiIpVersion, addr)
+	})
+	downloader.SetDial(func(ctx context.Context, network, addr string) (net.Conn, error) {
+		dialer := &net.Dialer{}
+		return dialer.Dial(network+cliOcaIpVersion, addr)
+	})
 	var mutex sync.Mutex
-	client := req.C()
 	Fast := FastAPIResp{}
 	client.R().SetSuccessResult(&Fast).Get("https://api.fast.com/netflix/speedtest/v2?https=true&token=YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm&urlCount=2")
 	for _, v := range Fast.Targets {
@@ -82,7 +99,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("Got Connetion to", v.Hostname(), "in", float64(traceinfo.TCPConnectTime.Nanoseconds())/1e6, "ms")
+		fmt.Println("Got Connetion to", v.Hostname(), "in", float64(traceinfo.FirstResponseTime.Nanoseconds())/1e6, "ms")
 	}
 	var wg sync.WaitGroup
 	exitChannel := make(chan int)
