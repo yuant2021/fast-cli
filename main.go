@@ -39,7 +39,7 @@ var urls []*url.URL
 var downloader = req.NewClient()
 var totalBytes uint64
 var bytesPerThread []uint64
-var threads = 4
+var threads int
 var respTime []float64
 var firstRespTime []float64
 var speed []float64
@@ -67,7 +67,7 @@ func Request(url *url.URL, path string, callback func(info req.DownloadInfo)) (r
 func init() {
 	flag.StringVar(&cliOcaIpVersion, "o", "", "Set Connect OCA IP Version")
 	flag.StringVar(&cliFastApiIpVersion, "a", "", "Set Connect Fast API IP Version")
-	flag.IntVar(&threads, "t", "", "Set Threads")
+	flag.IntVar(&threads, "t", 4, "Set Threads")
 	downloader.EnableTraceAll()
 	// downloader.EnableDumpAll()
 	bytesPerThread = make([]uint64, threads)
